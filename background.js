@@ -5,8 +5,8 @@
  * 作ったタブはタブバーの末尾に配置される。リンクから開いたタブは Chrome 自身が
  * 開き元の隣に配置するため、移動先が現在位置以上になり結果として no-op になる。
  *
- * アドレスバーの Cmd/Alt+Enter で作ったタブは背面に開かれるので、移動に加えて
- * 前面に出す。
+ * アドレスバーの Cmd/Alt+Enter や Cmd+クリックで作ったタブは背面に開かれるので、
+ * 開き元が分かるものは前面に出す。
  */
 
 // 原因切り分け用のログ。調査したいときだけ true にする。
@@ -170,9 +170,9 @@ async function placeNewTab(tab) {
   if (!win) return log('skip: window not found');
   if (win.type !== 'normal') return log('skip: window type is', win.type);
 
-  // アドレスバーの Cmd/Alt+Enter（URL を新しいタブで開く＝実質のタブ複製）で作られた
-  // タブはアクティブにならず、しかもタブバーの末尾に置かれる。Cmd+クリックで背面に
-  // 開いたリンクタブは Chrome が opener の隣へ置くので、その位置と比べて判別する。
+  // アドレスバーの Cmd/Alt+Enter（URL を新しいタブで開く＝実質のタブ複製）と
+  // Cmd+クリックのリンクタブはどちらもアクティブにならない。前者はタブバーの末尾に
+  // 置かれるので、Chrome が背面タブを置く位置を計算して寄せる。
   if (!tab.active) {
     // 開き元が分からない非アクティブタブ（セッション復元など）は並び順を尊重する。
     if (tab.openerTabId === undefined) return log('skip: inactive without opener');
@@ -185,12 +185,10 @@ async function placeNewTab(tab) {
 
     // Chrome が置いた位置がそのまま slot なら移動距離が 0 以下になり no-op。
     // 既存の子タブの後ろを狙うのは、続けて開いたタブが逆順に並ばないようにするため。
-    if (await moveTo(tab, slot)) {
-      // 移動したタブだけを前面に出す。Cmd+クリックで背面に開いたリンクタブは
-      // 上の no-op で弾かれるため、フォーカスを奪わない。
-      await chrome.tabs.update(tab.id, { active: true });
-      log('activated tab', tab.id);
-    }
+    await moveTo(tab, slot);
+
+    await chrome.tabs.update(tab.id, { active: true });
+    log('activated tab', tab.id);
     return;
   }
 
